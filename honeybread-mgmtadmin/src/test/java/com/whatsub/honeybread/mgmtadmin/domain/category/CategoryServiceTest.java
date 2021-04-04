@@ -7,6 +7,7 @@ import com.whatsub.honeybread.core.infra.exception.HoneyBreadException;
 import com.whatsub.honeybread.mgmtadmin.domain.category.dto.CategoryRequest;
 import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mock;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.context.TestConstructor;
@@ -17,8 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
+import static org.mockito.BDDMockito.then;
 
 @TestConstructor(autowireMode = TestConstructor.AutowireMode.ALL)
 @SpringBootTest(classes = CategoryService.class)
@@ -29,135 +29,162 @@ class CategoryServiceTest {
     @MockBean
     CategoryRepository repository;
 
+    @Mock
+    Category category;
+
     @Test
     void 중복되는_카테고리가_없다면_등록_성공() {
         // given
-        CategoryRequest 카테고리_생성_요청 = generateRequest("한식");
-
-        given(repository.existsByName(anyString())).willReturn(false);
-        given(repository.save(any(Category.class))).willReturn(mock(Category.class));
+        중복되는_카테고리가_없다();
+        given(repository.save(any(Category.class))).willReturn(category);
 
         // when
-        service.create(카테고리_생성_요청);
+        카테고리_등록();
 
         // then
-        verify(repository).existsByName(anyString());
-        verify(repository).save(any(Category.class));
+        중복_카테고리_확인이_수행되어야_한다();
+        then(repository).should().save(any(Category.class));
     }
 
     @Test
     void 중복되는_카테고리가_있다면_예외_발생() {
         // given
-        CategoryRequest 카테고리_생성_요청 = generateRequest("한식");
-
-        given(repository.existsByName(anyString())).willReturn(true);
+        중복되는_카테고리가_있다();
 
         // when
-        HoneyBreadException ex = assertThrows(
-            HoneyBreadException.class,
-            () -> service.create(카테고리_생성_요청)
-        );
+        HoneyBreadException ex = assertThrows(HoneyBreadException.class, this::카테고리_등록);
 
         // then
-        assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.DUPLICATE_CATEGORY);
+        중복_카테고리_확인이_수행되어야_한다();
+        중복_카테고리_에러코드_확인(ex);
     }
 
     @Test
     void 수정요청시_중복되는_카테고리가_없다면_수정_성공() {
         // given
-        final Long categoryId = 1L;
-        final Category mockCategory = mock(Category.class);
-
-        CategoryRequest 카테고리_수정_요청 = generateRequest("한식을 중식으로 수정");
-
-        given(repository.findById(anyLong())).willReturn(Optional.of(mockCategory));
-        given(repository.existsByName(anyString())).willReturn(false);
+        카테고리_조회에_성공한다();
+        중복되는_카테고리가_없다();
 
         // when
-        service.update(categoryId, 카테고리_수정_요청);
+        카테고리_수정();
 
         // then
-        verify(repository).findById(anyLong());
-        verify(repository).existsByName(anyString());
-        verify(mockCategory).update(any(Category.class));
+        카테고리_조회가_수행되어야_한다();
+        중복_카테고리_확인이_수행되어야_한다();
+        then(category).should().update(any(Category.class));
     }
 
     @Test
     void 수정요청시_중복되는_카테고리가_있다면_예외_발생() {
         // given
-        final Long categoryId = 1L;
-        final Category mockCategory = mock(Category.class);
-
-        CategoryRequest 카테고리_수정_요청 = generateRequest("한식을 중식으로 수정");
-
-        given(repository.findById(anyLong())).willReturn(Optional.of(mockCategory));
-        given(repository.existsByName(anyString())).willReturn(true);
+        카테고리_조회에_성공한다();
+        중복되는_카테고리가_있다();
 
         // when
-        HoneyBreadException ex = assertThrows(
-            HoneyBreadException.class,
-            () -> service.update(categoryId, 카테고리_수정_요청)
-        );
+        HoneyBreadException ex = assertThrows(HoneyBreadException.class, this::카테고리_수정);
 
         // then
-        assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.DUPLICATE_CATEGORY);
+        카테고리_조회가_수행되어야_한다();
+        중복_카테고리_확인이_수행되어야_한다();
+        중복_카테고리_에러코드_확인(ex);
     }
 
     @Test
     void 수정요청시_해당카테고리가_없다면_예외_발생() {
         // given
-        final Long categoryId = 1L;
-
-        CategoryRequest 카테고리_수정_요청 = generateRequest("한식을 중식으로 수정");
-
-        given(repository.findById(anyLong())).willReturn(Optional.empty());
+        카테고리_조회에_실패한다();
 
         // when
-        HoneyBreadException ex = assertThrows(
-            HoneyBreadException.class,
-            () -> service.update(categoryId, 카테고리_수정_요청)
-        );
+        HoneyBreadException ex = assertThrows(HoneyBreadException.class, this::카테고리_수정);
 
         // then
-        assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.CATEGORY_NOT_FOUND);
+        카테고리_조회가_수행되어야_한다();
+        카테고리_찾을수_없음_에러코드_확인(ex);
     }
 
     @Test
     void 삭제요청시_해당카테고리가_있다면_삭제_성공() {
         // given
-        final Long categoryId = 1L;
-        final Category mockCategory = mock(Category.class);
-
-        given(repository.findById(anyLong())).willReturn(Optional.of(mockCategory));
+        카테고리_조회에_성공한다();
 
         // when
-        service.delete(categoryId);
+        카테고리_삭제();
 
         // then
-        verify(repository).findById(anyLong());
-        verify(repository).delete(any(Category.class));
+        카테고리_조회가_수행되어야_한다();
+        then(repository).should().delete(any(Category.class));
     }
 
     @Test
     void 삭제요청시_해당카테고리가_없다면_예외_발생() {
         // given
-        final Long categoryId = 1L;
-
-        given(repository.findById(anyLong())).willReturn(Optional.empty());
+        카테고리_조회에_실패한다();
 
         // when
-        HoneyBreadException ex = assertThrows(
-            HoneyBreadException.class,
-            () -> service.delete(categoryId)
-        );
+        HoneyBreadException ex = assertThrows(HoneyBreadException.class, this::카테고리_삭제);
 
         // then
-        verify(repository).findById(anyLong());
+        카테고리_조회가_수행되어야_한다();
+        카테고리_찾을수_없음_에러코드_확인(ex);
+    }
 
+    /**
+     * Given
+     */
+    private void 중복되는_카테고리가_있다() {
+        given(repository.existsByName(anyString())).willReturn(true);
+    }
+
+    private void 중복되는_카테고리가_없다() {
+        given(repository.existsByName(anyString())).willReturn(false);
+    }
+
+    private void 카테고리_조회에_성공한다() {
+        given(repository.findById(anyLong())).willReturn(Optional.of(category));
+    }
+
+    private void 카테고리_조회에_실패한다() {
+        given(repository.findById(anyLong())).willReturn(Optional.empty());
+    }
+
+    /**
+     * When
+     */
+    private void 카테고리_등록() {
+        service.create(카테고리_요청("한식"));
+    }
+
+    private void 카테고리_수정() {
+        service.update(anyLong(), 카테고리_요청("한식을 중식으로 수정"));
+    }
+
+    private void 카테고리_삭제() {
+        service.delete(anyLong());
+    }
+
+    /**
+     * Then
+     */
+    private void 중복_카테고리_확인이_수행되어야_한다() {
+        then(repository).should().existsByName(anyString());
+    }
+
+    private void 카테고리_조회가_수행되어야_한다() {
+        then(repository).should().findById(anyLong());
+    }
+
+    private void 중복_카테고리_에러코드_확인(HoneyBreadException ex) {
+        assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.DUPLICATE_CATEGORY);
+    }
+
+    private void 카테고리_찾을수_없음_에러코드_확인(HoneyBreadException ex) {
         assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.CATEGORY_NOT_FOUND);
     }
 
-    private CategoryRequest generateRequest(final String name) {
+    /**
+     * Helper
+     */
+    private CategoryRequest 카테고리_요청(final String name) {
         return new CategoryRequest(name);
     }
 }
